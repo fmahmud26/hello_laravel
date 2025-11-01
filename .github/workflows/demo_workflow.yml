@@ -39,7 +39,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
-          password: ${{ secrets.EC2_PRIVATE_KEY }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
           port: ${{ secrets.PORT }}
           script: |
             # Stop old container
