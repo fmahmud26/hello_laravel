@@ -3,33 +3,37 @@ name: Deploy Laravel Docker to EC2
 on:
   push:
     branches:
-      - main   # trigger on push to main branch
+      - main   # Trigger deploy on push to main branch
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout code
-      - name: Checkout Repository
+      # Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Set up Docker Buildx
+      # Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Step 3: Log in to Docker (optional if pushing to Docker Hub)
-      # - name: Log in to DockerHub
-      #   uses: docker/login-action@v2
-      #   with:
-      #     username: ${{ secrets.DOCKER_USERNAME }}
-      #     password: ${{ secrets.DOCKER_PASSWORD }}
+      # Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 4: Build Docker image
-      - name: Build Docker Image
-        run: docker build -t laravel-app .
+      # Build Docker image
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest .
 
-      # Step 5: Copy project to EC2 and run Docker
+      # Push Docker image to Docker Hub
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
+
+      # Deploy to EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -37,19 +41,11 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
-            # Stop and remove old container if exists
+            # Stop old container
             docker rm -f hello_laravel_app || true
             
-            # Pull latest code (optional if using git)
-            cd /var/www/html || mkdir -p /var/www/html
-            rm -rf /var/www/html/*
+            # Pull latest image
+            docker pull ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
             
-            # Copy all repo files
-            scp -r $GITHUB_WORKSPACE/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/html/
-            
-            # Build Docker container on EC2
-            cd /var/www/html
-            docker build -t laravel-app .
-            
-            # Run Docker container
-            docker run -d -p 8000:8000 --name hello_laravel_app laravel-app
+            # Run container
+            docker run -d -p 8000:8000 --name hello_laravel_app ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
