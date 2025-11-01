@@ -58,6 +58,7 @@ RUN touch database/database.sqlite \
     && chmod 664 database/database.sqlite
 
 # Clear Laravel caches
+COPY .env.example .env
 RUN php artisan config:clear \
     && php artisan cache:clear \
     && php artisan view:clear \
