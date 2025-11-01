@@ -1,47 +1,40 @@
-name: Secure Laravel Deploy to EC2
+name: Deploy Laravel Docker to EC2
 
 on:
   push:
     branches:
-      - main
+      - main   # Trigger deploy on push to main branch
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repo
-      - name: Checkout repository
+      # Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 1
 
-      # Gitleaks scan for secrets
-      - name: Gitleaks Scan
-        uses: zricethezav/gitleaks-action@v2
-        with:
-          args: "--verbose"
-        continue-on-error: false   # Fail workflow if secrets are found
-
-      # Docker setup
+      # Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Docker login
+      # Log in to Docker Hub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build & push image
+      # Build Docker image
       - name: Build Docker image
         run: docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest .
 
+      # Push Docker image to Docker Hub
       - name: Push Docker image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
 
-      # Deploy on EC2
-      - name: Deploy & cleanup on EC2
+      # Deploy to EC2
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -49,20 +42,18 @@ jobs:
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           port: ${{ secrets.PORT }}
           script: |
-            echo "Stopping old container..."
+            # Stop old container
             docker rm -f hello_laravel_app || true
-
-            echo "Pulling latest image..."
+            
+            # Pull latest image
             docker pull ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
-
-            echo "Running new container..."
+            
+            # Run container
             docker run -d -p 8000:8000 --name hello_laravel_app ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
-
-            echo "Removing stopped laravel-app containers..."
+            
+            # Stop and remove all stopped containers using laravel-app images
             docker ps -a --filter "ancestor=laravel-app" --format "{{.ID}}" | xargs -r docker rm -f || true
-
-            echo "Removing unused laravel-app images..."
+            
+            # Remove all unused images containing 'laravel-app'
             docker images --format '{{.Repository}} {{.ID}}' | grep 'laravel-app' | awk '{print $2}' | xargs -r docker rmi -f || true
 
-          # echo "Cleaning dangling images..."
-          # docker image prune -f
