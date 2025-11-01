@@ -50,3 +50,10 @@ jobs:
             
             # Run container
             docker run -d -p 8000:8000 --name hello_laravel_app ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
+            
+            # Stop and remove all stopped containers using laravel-app images
+            docker ps -a --filter "ancestor=laravel-app" --format "{{.ID}}" | xargs -r docker rm -f
+            
+            # Remove all unused images containing 'laravel-app'
+            docker images --format '{{.Repository}} {{.ID}}' | grep 'laravel-app' | awk '{print $2}' | xargs -r docker rmi -f
+
