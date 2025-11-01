@@ -7,8 +7,9 @@ services:
       dockerfile: Dockerfile
     container_name: hello_laravel_app
     ports:
-      - "8000:8000" # host:container
+      - "8000:8000"
     environment:
       - TZ=UTC
     restart: unless-stopped
-    command: php artisan serve --host=0.0.0.0 --port=8000
+    # Entry point will handle artisan commands & server
+    command: docker-entrypoint.sh

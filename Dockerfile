@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y \
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 
-# Copy project files first
+# Copy project files
 COPY . .
 
 # Install PHP dependencies
@@ -57,15 +57,12 @@ RUN mkdir -p storage bootstrap/cache database \
 RUN touch database/database.sqlite \
     && chmod 664 database/database.sqlite
 
-# Clear Laravel caches
-COPY .env.example .env
-RUN php artisan config:clear \
-    && php artisan cache:clear \
-    && php artisan view:clear \
-    && php artisan route:clear
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Expose port 8000
+# Expose Laravel port
 EXPOSE 8000
 
-# Default command to run Laravel
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+# Run entrypoint script as default
+CMD ["docker-entrypoint.sh"]
