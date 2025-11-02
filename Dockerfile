@@ -64,5 +64,6 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Expose Laravel port
 EXPOSE 8000
 
+
 # Run entrypoint script as default
 CMD ["docker-entrypoint.sh"]
