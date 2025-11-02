@@ -2,15 +2,13 @@ name: Laravel Deploy to EKS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   # Checkout Code
   checkout:
     runs-on: ubuntu-latest
     steps:
-      # Checkout repository
       - name: Checkout Code
         uses: actions/checkout@v3
 
@@ -28,30 +26,38 @@ jobs:
           args: "--verbose"
 
   # Docker Build & Push
-  docker-build-push:
+  docker-build-and-push:
     runs-on: ubuntu-latest
     needs: gitleaks-scan
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Docker login
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build & Push Docker image
+      - name: Build and Push Docker Image
         env:
-          IMAGE_TAG: ${{ github.run_number }}
+          IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/laravel-app
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:${IMAGE_TAG} .
-          docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:${IMAGE_TAG}
-          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+          docker push $IMAGE_NAME:$IMAGE_TAG
 
   # Deploy to EKS
   eks-deploy:
     runs-on: ubuntu-latest
-    needs: docker-build-push
+    needs: docker-build-and-push
     steps:
-      # Configure AWS credentials
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -59,17 +65,19 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Update kubeconfig
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-      # Deploy Laravel
-      - name: Deploy to EKS
+      - name: Replace image tag in deployment
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" k8s/deployment.yaml
+
+      - name: Apply Deployment and Service
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           kubectl rollout status deployment/laravel-app -n default --timeout=300s
 
-      # Show LoadBalancer URL
       - name: Show Service URL
         run: kubectl get svc laravel-app -n default -o wide
