@@ -4,11 +4,6 @@ metadata:
   name: laravel-app
 spec:
   replicas: 2
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
   selector:
     matchLabels:
       app: laravel-app
@@ -17,39 +12,31 @@ spec:
       labels:
         app: laravel-app
     spec:
+      volumes:
+        - name: app-key
+          emptyDir: {}
+      initContainers:
+        - name: generate-app-key
+          image: alpine:latest
+          command:
+            - sh
+            - -c
+            - |
+              php artisan key:generate --show > /app-key/APP_KEY
+          volumeMounts:
+            - name: app-key
+              mountPath: /app-key
       containers:
         - name: laravel-app
           image: fmahmud26/laravel-app:${IMAGE_TAG}
-          imagePullPolicy: Always
           ports:
             - containerPort: 80
-          envFrom:
-            - configMapRef:
-                name: laravel-config
           env:
             - name: APP_KEY
               valueFrom:
-                secretKeyRef:
-                  name: laravel-secret
+                configMapKeyRef:
+                  name: app-key-config
                   key: APP_KEY
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
           volumeMounts:
-            - mountPath: /var/www/html/database
-              name: laravel-db
-            - mountPath: /var/www/html/storage
-              name: laravel-storage
-            - mountPath: /var/www/html/bootstrap/cache
-              name: laravel-cache
-      volumes:
-        - name: laravel-db
-          emptyDir: {}
-        - name: laravel-storage
-          emptyDir: {}
-        - name: laravel-cache
-          emptyDir: {}
+            - name: app-key
+              mountPath: /app-key
