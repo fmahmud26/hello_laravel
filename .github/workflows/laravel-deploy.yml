@@ -53,6 +53,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-push
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -63,16 +69,10 @@ jobs:
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-      - name: Replace image tag in deployment
-        run: |
-          IMAGE_TAG=${{ github.run_number }}
-          sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" k8s/deployment.yaml
-
       - name: Apply Deployment and Service
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
+          # Update deployment image dynamically without editing YAML
+          kubectl set image deployment/laravel-app laravel-app=${{ secrets.DOCKER_USERNAME }}/laravel-app:${{ github.run_number }}
           kubectl rollout status deployment/laravel-app -n default --timeout=300s
-
-      - name: Show LoadBalancer URL
-        run: kubectl get svc laravel-app -n default -o wide
