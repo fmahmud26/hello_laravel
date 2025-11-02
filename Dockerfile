@@ -1,14 +1,11 @@
-# Use Ubuntu 24.04 LTS as base
 FROM ubuntu:24.04
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-# Update & install dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y \
     software-properties-common \
     curl \
@@ -34,20 +31,29 @@ RUN apt-get update && apt-get install -y \
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 
 # Create necessary directories
-RUN mkdir -p storage bootstrap/cache database
+RUN mkdir -p storage/framework/{sessions,views,cache} storage/logs bootstrap/cache database
 
-# Copy entire application
+# Copy application
 COPY . .
 
-# Install dependencies and set up application
-COPY .env.example .env
-RUN composer install --no-dev --optimize-autoloader \
-    && touch database/database.sqlite \
-    && chmod -R 775 storage bootstrap/cache database \
-    && php artisan key:generate --force || true
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
 
-# Expose port 8000 for artisan serve
+# Set up environment and permissions
+RUN if [ ! -f .env ]; then cp .env.example .env; fi \
+    && php artisan key:generate --force \
+    && chmod -R 775 storage bootstrap/cache database \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+cd /var/www/html\n\
+touch database/database.sqlite\n\
+chmod 664 database/database.sqlite\n\
+php artisan migrate --force\n\
+php artisan serve --host=0.0.0.0 --port=8000' > /startup.sh \
+    && chmod +x /startup.sh
+
 EXPOSE 8000
 
-# Default command to run Laravel
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+CMD ["/startup.sh"]
