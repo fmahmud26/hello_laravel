@@ -6,9 +6,6 @@ spec:
   replicas: 1
   strategy:
     type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
   selector:
     matchLabels:
       app: laravel-app
@@ -17,12 +14,10 @@ spec:
       labels:
         app: laravel-app
     spec:
-      securityContext:
-        runAsUser: 0
-        runAsGroup: 0
       containers:
         - name: laravel-app
-          image: fmahmud26/laravel-app:latest
+          image: fmahmud26/laravel-app:${IMAGE_TAG}
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           env:
@@ -31,7 +26,11 @@ spec:
             - name: APP_DEBUG
               value: "false"
             - name: APP_URL
-              value: "http://localhost"
+              value: "http://laravel-app.default.svc.cluster.local"
+            - name: DB_CONNECTION
+              value: sqlite
+            - name: DB_DATABASE
+              value: /var/www/html/database/database.sqlite
           resources:
             requests:
               cpu: 50m
@@ -48,21 +47,8 @@ spec:
               name: laravel-cache
       volumes:
         - name: laravel-db
-          emptyDir: {}
+          emptyDir: { }
         - name: laravel-storage
-          emptyDir: {}
+          emptyDir: { }
         - name: laravel-cache
-          emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: laravel-app
-spec:
-  selector:
-    app: laravel-app
-  ports:
-    - protocol: TCP
-      port: 80        # Public LB port
-      targetPort: 80  # Container port
-  type: LoadBalancer
+          emptyDir: { }
