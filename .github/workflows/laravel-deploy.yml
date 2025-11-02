@@ -50,7 +50,6 @@ jobs:
       # Deploy to EKS
       - name: Deploy Laravel to EKS
         run: |
-          kubectl apply -f k8s/configmap.yaml
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           kubectl rollout status deployment/laravel-app -n default --timeout=300s
