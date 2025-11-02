@@ -14,14 +14,6 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      sqlite:
-        image: nouchka/sqlite3
-        options: >-
-          --health-cmd="sqlite3 --version"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
 
     steps:
       - name: Checkout code
@@ -31,24 +23,50 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: sqlite, gd, mbstring, xml
+          extensions: sqlite3, gd, mbstring, xml, curl, zip
+          tools: composer
 
-      - name: Copy .env
+      - name: Install SQLite (system package)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+
+      - name: Check SQLite installation
+        run: |
+          sqlite3 --version
+          php -m | grep sqlite
+
+      - name: Copy .env and setup database
         run: |
           cp .env.example .env
           echo "DB_CONNECTION=sqlite" >> .env
-          echo "DB_DATABASE=/tmp/database.sqlite" >> .env
+          echo "DB_DATABASE=$(pwd)/database/database.sqlite" >> .env
+          mkdir -p database
+          touch database/database.sqlite
+          ls -la database/
 
-      - name: Install dependencies
+      - name: Install Composer dependencies
         run: |
-          composer install --no-progress --no-interaction
-          php artisan key:generate
+          composer install --no-progress --no-interaction --prefer-dist
 
-      - name: Execute tests
+      - name: Generate application key
+        run: php artisan key:generate
+
+      - name: Create database and run migrations
         run: |
-          touch /tmp/database.sqlite
-          php artisan migrate --force
-          php artisan test
+          php artisan migrate:status || php artisan migrate --force
+
+      - name: Run tests
+        run: |
+          php artisan config:clear
+          php artisan cache:clear
+          php artisan route:clear
+          php artisan test --env=testing
+
+      - name: Run PHPStan (optional static analysis)
+        run: |
+          composer require --dev phpstan/phpstan
+          ./vendor/bin/phpstan analyse app/ --level=5
 
   build-and-deploy:
     needs: test
@@ -114,5 +132,9 @@ jobs:
 
       - name: Verify deployment
         run: |
-          kubectl get all -n laravel-app
-          kubectl get ingress -n laravel-app
+          echo "=== Deployment Status ==="
+          kubectl get deployments -n laravel-app
+          echo "=== Pods Status ==="
+          kubectl get pods -n laravel-app
+          echo "=== Services Status ==="
+          kubectl get services -n laravel-app
