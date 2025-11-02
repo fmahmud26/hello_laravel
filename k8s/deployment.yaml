@@ -12,31 +12,17 @@ spec:
       labels:
         app: laravel-app
     spec:
-      volumes:
-        - name: app-key
-          emptyDir: {}
-      initContainers:
-        - name: generate-app-key
-          image: alpine:latest
-          command:
-            - sh
-            - -c
-            - |
-              php artisan key:generate --show > /app-key/APP_KEY
-          volumeMounts:
-            - name: app-key
-              mountPath: /app-key
       containers:
         - name: laravel-app
           image: fmahmud26/laravel-app:${IMAGE_TAG}
           ports:
-            - containerPort: 80
+            - containerPort: 8000
           env:
             - name: APP_KEY
-              valueFrom:
-                configMapKeyRef:
-                  name: app-key-config
-                  key: APP_KEY
+              value: ""  # empty, docker-entrypoint.sh generates it
           volumeMounts:
-            - name: app-key
-              mountPath: /app-key
+            - name: app-storage
+              mountPath: /var/www/html/storage
+      volumes:
+        - name: app-storage
+          emptyDir: {}

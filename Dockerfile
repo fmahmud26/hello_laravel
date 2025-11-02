@@ -49,12 +49,12 @@ RUN mkdir -p storage bootstrap/cache database \
 # Create SQLite file if missing
 RUN touch database/database.sqlite && chmod 664 database/database.sqlite
 
-# Entrypoint
+# Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Expose port 80
-EXPOSE 80
+# Expose port 8000
+EXPOSE 8000
 
 # Default command
 CMD ["docker-entrypoint.sh"]
