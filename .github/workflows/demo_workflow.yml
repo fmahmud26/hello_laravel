@@ -59,3 +59,4 @@ jobs:
         run: |
           kubectl apply -f k8s/deployment.yaml -n default
           kubectl rollout status deployment/laravel-app -n default
+
