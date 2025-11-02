@@ -12,18 +12,8 @@ ENV TZ=UTC
 RUN apt-get update && apt-get install -y \
     software-properties-common \
     curl \
-    wget \
-    unzip \
     git \
     sqlite3 \
-    zip \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype-dev \
-    libonig-dev \
-    libzip-dev \
-    sudo \
-    nano \
     && add-apt-repository ppa:ondrej/php -y \
     && apt-get update \
     && apt-get install -y \
@@ -43,32 +33,17 @@ RUN apt-get update && apt-get install -y \
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 
-# Create storage and bootstrap/cache folders with write permissions
-RUN mkdir -p storage bootstrap/cache database \
-    && chmod -R 775 storage bootstrap/cache database
+# Create necessary directories
+RUN mkdir -p storage bootstrap/cache database
 
-# Copy composer files first (for better caching)
-COPY composer.json composer.lock ./
-
-# Install Composer dependencies (WITH scripts and autoloader)
-RUN composer install --no-dev --optimize-autoloader
-
-# Copy the rest of the application files
+# Copy entire application
 COPY . .
 
-# Set proper permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 storage bootstrap/cache
-
-# If using SQLite, create database file
-RUN touch database/database.sqlite \
-    && chmod 664 database/database.sqlite
-
-# Generate application key (if not exists) and optimize
-RUN php artisan key:generate --force || true \
-    && php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache
+# Install dependencies and set up application
+RUN composer install --no-dev --optimize-autoloader \
+    && touch database/database.sqlite \
+    && chmod -R 775 storage bootstrap/cache database \
+    && php artisan key:generate --force || true
 
 # Expose port 8000 for artisan serve
 EXPOSE 8000
