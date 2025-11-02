@@ -12,20 +12,38 @@ spec:
       labels:
         app: laravel-app
     spec:
+      # Run container as root so entrypoint can write to storage & database
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
       containers:
         - name: laravel-app
           image: fmahmud26/laravel-app:latest
           ports:
             - containerPort: 8000
           env:
-            - name: APP_KEY
-              value: "base64:8a3f5c7d2b9e4f1a6d7c9b2e5f1a8c3d"
             - name: APP_ENV
               value: production
             - name: APP_DEBUG
               value: "false"
             - name: APP_URL
               value: "http://localhost"
+          # Mount writable volumes for Laravel
+          volumeMounts:
+            - mountPath: /var/www/html/database
+              name: laravel-db
+            - mountPath: /var/www/html/storage
+              name: laravel-storage
+            - mountPath: /var/www/html/bootstrap/cache
+              name: laravel-cache
+      # EmptyDir volumes survive during pod lifetime
+      volumes:
+        - name: laravel-db
+          emptyDir: {}
+        - name: laravel-storage
+          emptyDir: {}
+        - name: laravel-cache
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
