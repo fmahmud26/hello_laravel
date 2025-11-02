@@ -47,19 +47,32 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin -
 RUN mkdir -p storage bootstrap/cache database \
     && chmod -R 775 storage bootstrap/cache database
 
-# Copy project files
+# Copy composer files first (for better caching)
+COPY composer.json composer.lock ./
+
+# Install Composer dependencies
+RUN composer install --no-dev --no-scripts --no-autoloader
+
+# Copy the rest of the application files
 COPY . .
+
+# Run composer autoloader and optimize
+RUN composer dump-autoload --optimize
 
 # If using SQLite, create database file
 RUN touch database/database.sqlite \
     && chmod 664 database/database.sqlite
+
+# Set proper permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 775 storage bootstrap/cache
 
 # Run PHP artisan commands (cache clear, migrate, etc.)
 RUN php artisan config:clear \
     && php artisan cache:clear \
     && php artisan view:clear \
     && php artisan route:clear \
-    && php artisan migrate || echo "Migration skipped if DB not set up"
+    && php artisan optimize:clear
 
 # Expose port 8000 for artisan serve
 EXPOSE 8000
