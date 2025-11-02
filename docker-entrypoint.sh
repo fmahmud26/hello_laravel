@@ -17,5 +17,5 @@ php artisan cache:clear
 php artisan view:clear
 php artisan route:clear
 
-# ✅ Start PHP built-in server on port 80
+# Start PHP built-in server on port 80 (production for now)
 php -S 0.0.0.0:80 -t public

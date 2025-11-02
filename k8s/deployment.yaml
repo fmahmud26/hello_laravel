@@ -5,7 +5,6 @@ metadata:
 spec:
   replicas: 1
 
-  # Rolling update strategy for zero downtime
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -20,7 +19,6 @@ spec:
       labels:
         app: laravel-app
     spec:
-      # Run container as root so entrypoint can write to storage & database
       securityContext:
         runAsUser: 0
         runAsGroup: 0
@@ -38,13 +36,11 @@ spec:
               value: "http://localhost"
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 128Mi
             limits:
-              cpu: 300m
-              memory: 512Mi
-
-          # Mount writable volumes for Laravel
+              cpu: 200m
+              memory: 256Mi
           volumeMounts:
             - mountPath: /var/www/html/database
               name: laravel-db
@@ -52,8 +48,6 @@ spec:
               name: laravel-storage
             - mountPath: /var/www/html/bootstrap/cache
               name: laravel-cache
-
-      # EmptyDir volumes survive during pod lifetime
       volumes:
         - name: laravel-db
           emptyDir: {}
