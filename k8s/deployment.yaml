@@ -4,6 +4,8 @@ metadata:
   name: laravel-app
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app: laravel-app
@@ -15,8 +17,38 @@ spec:
       containers:
         - name: laravel-app
           image: fmahmud26/laravel-app:${IMAGE_TAG}
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           env:
-            - name: APP_KEY
-              value: ""  # generated at runtime
+            - name: APP_ENV
+              value: production
+            - name: APP_DEBUG
+              value: "false"
+            - name: APP_URL
+              value: "http://localhost"
+            - name: DB_CONNECTION
+              value: sqlite
+            - name: DB_DATABASE
+              value: /var/www/html/database/database.sqlite
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          volumeMounts:
+            - mountPath: /var/www/html/database
+              name: laravel-db
+            - mountPath: /var/www/html/storage
+              name: laravel-storage
+            - mountPath: /var/www/html/bootstrap/cache
+              name: laravel-cache
+      volumes:
+        - name: laravel-db
+          emptyDir: {}
+        - name: laravel-storage
+          emptyDir: {}
+        - name: laravel-cache
+          emptyDir: {}
