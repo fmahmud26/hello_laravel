@@ -16,12 +16,12 @@ jobs:
         with:
           fetch-depth: 1
 
-      # 2. Gitleaks scan for secrets
+      # 2. Gitleaks scan
       - name: Gitleaks Scan
         uses: zricethezav/gitleaks-action@v2
         with:
           args: "--verbose"
-        continue-on-error: false   # Fail workflow if secrets are found
+        continue-on-error: false
 
       # 3. Setup Docker Buildx
       - name: Set up Docker Buildx
@@ -54,9 +54,24 @@ jobs:
         run: |
           aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-      # 8. Deploy to EKS using deployment.yaml
+      # 8. Pre-clean old Laravel pods if resources are full
+      - name: Cleanup old deployments if needed
+        run: |
+          echo "Cleaning up old Laravel pods if they exist..."
+          kubectl delete deployment laravel-app -n default --ignore-not-found
+          kubectl delete pod -l app=laravel-app -n default --ignore-not-found
+          sleep 10
+
+      # 9. Deploy to EKS
       - name: Deploy to EKS
         run: |
+          echo "Applying updated deployment..."
           kubectl apply -f k8s/deployment.yaml -n default
-          kubectl rollout status deployment/laravel-app -n default
+          echo "Waiting for rollout..."
+          kubectl rollout status deployment/laravel-app -n default --timeout=300s
 
+      # 10. Verify service and show URL
+      - name: Show service external URL
+        run: |
+          echo "Fetching Laravel Service external URL..."
+          kubectl get svc laravel-app -n default -o wide

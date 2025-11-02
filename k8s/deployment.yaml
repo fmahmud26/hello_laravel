@@ -20,7 +20,7 @@ spec:
         - name: laravel-app
           image: fmahmud26/laravel-app:latest
           ports:
-            - containerPort: 8000
+            - containerPort: 80    # ✅ listen on port 80 instead of 8000
           env:
             - name: APP_ENV
               value: production
@@ -28,6 +28,20 @@ spec:
               value: "false"
             - name: APP_URL
               value: "http://localhost"
+
+          # ✅ Resource requests to allow scheduling on EKS
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+
+          # ✅ Run Laravel on port 80 instead of 8000
+          command: ["php"]
+          args: ["artisan", "serve", "--host=0.0.0.0", "--port=80"]
+
           # Mount writable volumes for Laravel
           volumeMounts:
             - mountPath: /var/www/html/database
@@ -36,6 +50,7 @@ spec:
               name: laravel-storage
             - mountPath: /var/www/html/bootstrap/cache
               name: laravel-cache
+
       # EmptyDir volumes survive during pod lifetime
       volumes:
         - name: laravel-db
@@ -54,6 +69,6 @@ spec:
     app: laravel-app
   ports:
     - protocol: TCP
-      port: 80
-      targetPort: 8000
+      port: 80         # ✅ public LoadBalancer port
+      targetPort: 80   # ✅ Laravel now serves on port 80
   type: LoadBalancer
