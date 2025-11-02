@@ -2,7 +2,8 @@ name: Laravel Deploy to EKS
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   # Checkout Code
@@ -17,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: checkout
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
       - name: Gitleaks Scan
@@ -26,38 +27,29 @@ jobs:
           args: "--verbose"
 
   # Docker Build & Push
-  docker-build-and-push:
+  docker-build-push:
     runs-on: ubuntu-latest
     needs: gitleaks-scan
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
       - name: Docker login
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Docker Image
+      - name: Build & Push Docker image
         env:
-          IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/laravel-app
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ github.run_number }}
         run: |
-          docker build -t $IMAGE_NAME:$IMAGE_TAG .
-          docker push $IMAGE_NAME:$IMAGE_TAG
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:${IMAGE_TAG} .
+          docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:${IMAGE_TAG}
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
   # Deploy to EKS
   eks-deploy:
     runs-on: ubuntu-latest
-    needs: docker-build-and-push
+    needs: docker-build-push
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -70,8 +62,7 @@ jobs:
 
       - name: Replace image tag in deployment
         run: |
-          IMAGE_TAG=${{ github.sha }}
-          sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" k8s/deployment.yaml
+          sed -i "s|\${IMAGE_TAG}|${{ github.run_number }}|g" k8s/deployment.yaml
 
       - name: Apply Deployment and Service
         run: |
@@ -79,5 +70,5 @@ jobs:
           kubectl apply -f k8s/service.yaml
           kubectl rollout status deployment/laravel-app -n default --timeout=300s
 
-      - name: Show Service URL
+      - name: Show LoadBalancer URL
         run: kubectl get svc laravel-app -n default -o wide

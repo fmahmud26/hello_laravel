@@ -8,5 +8,5 @@ spec:
     app: laravel-app
   ports:
     - protocol: TCP
-      port: 80        # Public LB port
-      targetPort: 80  # Container port
+      port: 80         # ELB listens on 80
+      targetPort: 80   # Container listens on 80

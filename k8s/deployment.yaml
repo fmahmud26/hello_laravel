@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: laravel-app
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
   selector:
@@ -14,6 +14,8 @@ spec:
       labels:
         app: laravel-app
     spec:
+      securityContext:
+        fsGroup: 1000  # ensures containers can write to volumes
       containers:
         - name: laravel-app
           image: fmahmud26/laravel-app:${IMAGE_TAG}
@@ -26,7 +28,7 @@ spec:
             - name: APP_DEBUG
               value: "false"
             - name: APP_URL
-              value: "http://laravel-app.default.svc.cluster.local"
+              value: "http://laravel-app" # Kubernetes service DNS
             - name: DB_CONNECTION
               value: sqlite
             - name: DB_DATABASE
@@ -47,8 +49,8 @@ spec:
               name: laravel-cache
       volumes:
         - name: laravel-db
-          emptyDir: { }
+          emptyDir: {}
         - name: laravel-storage
-          emptyDir: { }
+          emptyDir: {}
         - name: laravel-cache
-          emptyDir: { }
+          emptyDir: {}
