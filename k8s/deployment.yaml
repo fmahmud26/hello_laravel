@@ -14,8 +14,6 @@ spec:
       labels:
         app: laravel-app
     spec:
-      securityContext:
-        fsGroup: 1000  # ensures containers can write to volumes
       containers:
         - name: laravel-app
           image: fmahmud26/laravel-app:${IMAGE_TAG}
@@ -28,7 +26,7 @@ spec:
             - name: APP_DEBUG
               value: "false"
             - name: APP_URL
-              value: "http://laravel-app" # Kubernetes service DNS
+              value: "http://localhost"
             - name: DB_CONNECTION
               value: sqlite
             - name: DB_DATABASE
