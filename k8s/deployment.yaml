@@ -6,6 +6,9 @@ spec:
   replicas: 2
   strategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: laravel-app
@@ -23,19 +26,19 @@ spec:
           envFrom:
             - configMapRef:
                 name: laravel-config
-          # Optionally, override APP_URL dynamically via downward API
           env:
-            - name: APP_URL
+            - name: APP_KEY
               valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
+                secretKeyRef:
+                  name: laravel-secret
+                  key: APP_KEY
           resources:
             requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 200m
+              cpu: 100m
               memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           volumeMounts:
             - mountPath: /var/www/html/database
               name: laravel-db

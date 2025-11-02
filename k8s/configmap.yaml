@@ -3,6 +3,7 @@ kind: ConfigMap
 metadata:
   name: laravel-config
 data:
+  APP_NAME: Laravel
   APP_ENV: production
   APP_DEBUG: "false"
   DB_CONNECTION: sqlite
