@@ -17,5 +17,5 @@ php artisan cache:clear
 php artisan view:clear
 php artisan route:clear
 
-# Start Laravel server
-php artisan serve --host=0.0.0.0 --port=8000
+# ✅ Start PHP built-in server on port 80
+php -S 0.0.0.0:80 -t public

@@ -1,10 +1,8 @@
 # Use Ubuntu 24.04 LTS as base
 FROM ubuntu:24.04
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
@@ -61,8 +59,8 @@ RUN touch database/database.sqlite \
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Expose Laravel port
-EXPOSE 8000
+# Expose Laravel port for LoadBalancer
+EXPOSE 80
 
 # Run entrypoint script as default
 CMD ["docker-entrypoint.sh"]

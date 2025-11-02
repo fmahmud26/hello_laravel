@@ -28,7 +28,7 @@ spec:
         - name: laravel-app
           image: fmahmud26/laravel-app:latest
           ports:
-            - containerPort: 80    # Laravel now serves on port 80
+            - containerPort: 80
           env:
             - name: APP_ENV
               value: production
@@ -36,8 +36,6 @@ spec:
               value: "false"
             - name: APP_URL
               value: "http://localhost"
-
-          # Resource requests to allow scheduling
           resources:
             requests:
               cpu: 100m
@@ -45,10 +43,6 @@ spec:
             limits:
               cpu: 300m
               memory: 512Mi
-
-          # Run Laravel on port 80
-          command: ["php"]
-          args: ["artisan", "serve", "--host=0.0.0.0", "--port=80"]
 
           # Mount writable volumes for Laravel
           volumeMounts:
@@ -78,5 +72,5 @@ spec:
   ports:
     - protocol: TCP
       port: 80         # Public LoadBalancer port
-      targetPort: 80   # Laravel container port
+      targetPort: 80   # Container port
   type: LoadBalancer
