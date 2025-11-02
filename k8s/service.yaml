@@ -1,0 +1,30 @@
+# k8s/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: laravel-service
+spec:
+  selector:
+    app: laravel
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: laravel-config
+data:
+  .env: |
+    APP_NAME=Laravel
+    APP_ENV=production
+    APP_DEBUG=false
+    APP_URL=http://localhost
+    
+    DB_CONNECTION=sqlite
+    DB_DATABASE=/var/www/database/database.sqlite
+    
+    LOG_CHANNEL=stack
+    LOG_LEVEL=debug

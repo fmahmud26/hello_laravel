@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Create .env if missing
+# Copy .env if missing
 if [ ! -f .env ]; then
     cp .env.example .env
 fi
@@ -18,4 +18,4 @@ php artisan view:clear
 php artisan route:clear
 
 # Start Laravel server
-php artisan serve --host=0.0.0.0 --port=8000
+php artisan serve --host=0.0.0.0 --port=80

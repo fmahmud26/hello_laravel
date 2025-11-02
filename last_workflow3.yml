@@ -1,0 +1,69 @@
+name: Secure Laravel Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      # Gitleaks scan for secrets
+      - name: Gitleaks Scan
+        uses: zricethezav/gitleaks-action@v2
+        with:
+          args: "--verbose"
+        continue-on-error: false   # Fail workflow if secrets are found
+
+      # Docker setup
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Docker login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Build & push image
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest .
+
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
+
+      # Deploy on EC2
+      - name: Deploy & cleanup on EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            echo "Stopping old container..."
+            docker rm -f hello_laravel_app || true
+
+            echo "Pulling latest image..."
+            docker pull ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
+
+            echo "Running new container..."
+            docker run -d -p 8000:8000 --name hello_laravel_app ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
+
+            echo "Removing stopped laravel-app containers..."
+            docker ps -a --filter "ancestor=laravel-app" --format "{{.ID}}" | xargs -r docker rm -f || true
+
+            echo "Removing unused laravel-app images..."
+            docker images --format '{{.Repository}} {{.ID}}' | grep 'laravel-app' | awk '{print $2}' | xargs -r docker rmi -f || true
+
+          # echo "Cleaning dangling images..."
+          # docker image prune -f
+

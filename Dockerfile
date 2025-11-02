@@ -8,7 +8,7 @@ WORKDIR /var/www/html
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-# Install system dependencies & PHP
+# Update & install dependencies
 RUN apt-get update && apt-get install -y \
     software-properties-common \
     curl \
@@ -43,27 +43,26 @@ RUN apt-get update && apt-get install -y \
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 
-# Copy project files
-COPY . .
-
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
-
 # Create storage and bootstrap/cache folders with write permissions
 RUN mkdir -p storage bootstrap/cache database \
     && chmod -R 775 storage bootstrap/cache database
+
+# Copy project files
+COPY . .
 
 # If using SQLite, create database file
 RUN touch database/database.sqlite \
     && chmod 664 database/database.sqlite
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Run PHP artisan commands (cache clear, migrate, etc.)
+RUN php artisan config:clear \
+    && php artisan cache:clear \
+    && php artisan view:clear \
+    && php artisan route:clear \
+    && php artisan migrate || echo "Migration skipped if DB not set up"
 
-# Expose Laravel port
+# Expose port 8000 for artisan serve
 EXPOSE 8000
 
-
-# Run entrypoint script as default
-CMD ["docker-entrypoint.sh"]
+# Default command to run Laravel
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
