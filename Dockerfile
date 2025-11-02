@@ -68,6 +68,7 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 storage bootstrap/cache
 
 # Run PHP artisan commands (cache clear, migrate, etc.)
+COPY .env.example .env
 RUN php artisan config:clear \
     && php artisan cache:clear \
     && php artisan view:clear \
