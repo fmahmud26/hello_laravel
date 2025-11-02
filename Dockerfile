@@ -1,50 +1,56 @@
-FROM ubuntu:24.04
+# Dockerfile
+FROM php:8.2-fpm
 
-WORKDIR /var/www/html
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=UTC
+# Set working directory
+WORKDIR /var/www
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    software-properties-common \
-    curl \
-    unzip \
     git \
-    sqlite3 \
-    zip \
+    curl \
     libpng-dev \
-    libjpeg-dev \
-    libfreetype-dev \
     libonig-dev \
-    libzip-dev \
-    sudo \
-    nano \
-    && add-apt-repository ppa:ondrej/php -y \
-    && apt-get update && apt-get install -y \
-        php8.3-cli \
-        php8.3-sqlite3 \
-        php8.3-mbstring \
-        php8.3-bcmath \
-        php8.3-xml \
-        php8.3-zip \
-        php8.3-pdo \
-        php8.3-pdo-mysql \
-        php8.3-curl \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    libxml2-dev \
+    zip \
+    unzip \
+    sqlite3 \
+    libsqlite3-dev \
+    nginx
 
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install PHP extensions
+RUN docker-php-ext-install pdo pdo_sqlite mbstring exif pcntl bcmath gd
+
+# Install composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy application files
 COPY . .
 
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/sites-available/default
+
+# Create sqlite database directory
+RUN mkdir -p /var/www/database
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www \
+    && chmod -R 755 /var/www/storage \
+    && chmod -R 755 /var/www/bootstrap/cache
+
+# Install dependencies (remove for production if needed)
 RUN composer install --no-dev --optimize-autoloader
 
-RUN mkdir -p storage bootstrap/cache database \
-    && chmod -R 775 storage bootstrap/cache database \
-    && touch database/database.sqlite \
-    && chmod 664 database/database.sqlite
+# Generate application key
+RUN php artisan key:generate
 
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
+# Expose port
 EXPOSE 80
 
-CMD ["docker-entrypoint.sh"]
+# Start script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]

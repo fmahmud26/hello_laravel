@@ -1,54 +1,57 @@
+# k8s/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: laravel-app
+  labels:
+    app: laravel
 spec:
   replicas: 2
-  strategy:
-    type: RollingUpdate
   selector:
     matchLabels:
-      app: laravel-app
+      app: laravel
   template:
     metadata:
       labels:
-        app: laravel-app
+        app: laravel
     spec:
       containers:
         - name: laravel-app
-          image: fmahmud26/laravel-app:${IMAGE_TAG}
-          imagePullPolicy: Always
+          image: fmahmud26/laravel-app:latest
           ports:
             - containerPort: 80
           env:
             - name: APP_ENV
-              value: production
+              value: "production"
             - name: APP_DEBUG
               value: "false"
-            - name: APP_URL
-              value: "http://localhost"
             - name: DB_CONNECTION
-              value: sqlite
+              value: "sqlite"
             - name: DB_DATABASE
-              value: /var/www/html/database/database.sqlite
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 200m
-              memory: 256Mi
+              value: "/var/www/database/database.sqlite"
+            - name: PORT
+              value: "80"
           volumeMounts:
-            - mountPath: /var/www/html/database
-              name: laravel-db
-            - mountPath: /var/www/html/storage
-              name: laravel-storage
-            - mountPath: /var/www/html/bootstrap/cache
-              name: laravel-cache
+            - name: storage-volume
+              mountPath: /var/www/storage
+            - name: database-volume
+              mountPath: /var/www/database
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
       volumes:
-        - name: laravel-db
+        - name: storage-volume
           emptyDir: {}
-        - name: laravel-storage
+        - name: database-volume
           emptyDir: {}
-        - name: laravel-cache
-          emptyDir: {}
+      imagePullSecrets:
+        - name: dockerhub-secret

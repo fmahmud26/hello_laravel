@@ -1,57 +1,118 @@
-name: Laravel Deploy to EKS
+# .github/workflows/laravel-deploy.yml
+name: Deploy Laravel to EKS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  PORT: ${{ secrets.PORT || '80' }}
 
 jobs:
-  gitleaks-scan:
+  test:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-      - name: Gitleaks Scan
-        uses: zricethezav/gitleaks-action@v2
-        with:
-          args: "--verbose"
+    services:
+      sqlite:
+        image: nouchka/sqlite3
+        options: >-
+          --health-cmd="sqlite3 --version"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
 
-  docker-build-push:
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Docker login
-        uses: docker/login-action@v2
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: sqlite, gd, mbstring, xml
+
+      - name: Copy .env
+        run: |
+          cp .env.example .env
+          echo "DB_CONNECTION=sqlite" >> .env
+          echo "DB_DATABASE=/tmp/database.sqlite" >> .env
+
+      - name: Install dependencies
+        run: |
+          composer install --no-progress --no-interaction
+          php artisan key:generate
+
+      - name: Execute tests
+        run: |
+          touch /tmp/database.sqlite
+          php artisan migrate --force
+          php artisan test
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Build & Push Docker image
-        env:
-          IMAGE_TAG: ${{ github.run_number }}
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:${IMAGE_TAG} .
-          docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:${IMAGE_TAG}
-          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
-  eks-deploy:
-    runs-on: ubuntu-latest
-    needs: docker-build-push
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
+            ${{ secrets.DOCKER_USERNAME }}/laravel-app:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }}
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ secrets.AWS_REGION }} \
+            --name ${{ secrets.EKS_CLUSTER_NAME }}
+
       - name: Deploy to EKS
         run: |
-          kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
-          kubectl rollout status deployment/laravel-app -n default --timeout=300s
-      - name: Show Service URL
-        run: kubectl get svc laravel-app -n default -o wide
+          # Create namespace if it doesn't exist
+          kubectl create namespace laravel-app --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Create docker registry secret
+          kubectl create secret docker-registry dockerhub-secret \
+            --docker-server=docker.io \
+            --docker-username=${{ secrets.DOCKER_USERNAME }} \
+            --docker-password=${{ secrets.DOCKER_PASSWORD }} \
+            --namespace=laravel-app \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Deploy application
+          kubectl apply -f k8s/ -n laravel-app
+          
+          # Wait for deployment to complete
+          kubectl rollout status deployment/laravel-app -n laravel-app --timeout=300s
+
+      - name: Verify deployment
+        run: |
+          kubectl get all -n laravel-app
+          kubectl get ingress -n laravel-app
