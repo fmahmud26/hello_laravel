@@ -20,6 +20,18 @@ spec:
           env:
             - name: APP_KEY
               value: ""  # empty, docker-entrypoint.sh generates it
+            - name: APP_NAME
+              value: Laravel
+            - name: APP_ENV
+              value: local
+            - name: APP_DEBUG
+              value: "true"
+            - name: APP_URL
+              value: http://localhost
+            - name: DB_CONNECTION
+              value: sqlite
+            - name: DB_DATABASE
+              value: /var/www/html/database/database.sqlite
           volumeMounts:
             - name: app-storage
               mountPath: /var/www/html/storage
