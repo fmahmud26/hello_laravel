@@ -1,4 +1,4 @@
-name: Secure Laravel Deploy to EC2
+name: Laravel Deploy to EKS
 
 on:
   push:
@@ -16,12 +16,12 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Gitleaks scan for secrets
+      # Gitleaks scan
       - name: Gitleaks Scan
         uses: zricethezav/gitleaks-action@v2
         with:
           args: "--verbose"
-        continue-on-error: false   # Fail workflow if secrets are found
+        continue-on-error: false
 
       # Docker setup
       - name: Set up Docker Buildx
@@ -33,36 +33,27 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build & push image
+      # Build & push Docker image
       - name: Build Docker image
         run: docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest .
 
       - name: Push Docker image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
 
-      # Deploy on EC2
-      - name: Deploy & cleanup on EC2
-        uses: appleboy/ssh-action@v1
+      # Configure AWS & EKS
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_PRIVATE_KEY }}
-          port: ${{ secrets.PORT }}
-          script: |
-            echo "Stopping old container..."
-            docker rm -f hello_laravel_app || true
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-            echo "Pulling latest image..."
-            docker pull ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-            echo "Running new container..."
-            docker run -d -p 8000:8000 --name hello_laravel_app ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
-
-            echo "Removing stopped laravel-app containers..."
-            docker ps -a --filter "ancestor=laravel-app" --format "{{.ID}}" | xargs -r docker rm -f || true
-
-            echo "Removing unused laravel-app images..."
-            docker images --format '{{.Repository}} {{.ID}}' | grep 'laravel-app' | awk '{print $2}' | xargs -r docker rmi -f || true
-
-          # echo "Cleaning dangling images..."
-          # docker image prune -f
+      # Deploy to Kubernetes
+      - name: Deploy to EKS
+        run: |
+          kubectl set image deployment/laravel-app laravel-app=${{ secrets.DOCKER_USERNAME }}/laravel-app:latest -n default
+          kubectl rollout status deployment/laravel-app -n default

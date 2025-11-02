@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: laravel-app
+  template:
+    metadata:
+      labels:
+        app: laravel-app
+    spec:
+      containers:
+        - name: laravel-app
+          image: fmahmud26/laravel-app:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_KEY
+              value: "base64:8a3f5c7d2b9e4f1a6d7c9b2e5f1a8c3d"
+            - name: APP_ENV
+              value: production
+            - name: APP_DEBUG
+              value: "false"
+            - name: APP_URL
+              value: "http://localhost"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: laravel-app
+spec:
+  selector:
+    app: laravel-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: LoadBalancer
