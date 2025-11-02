@@ -1,12 +1,19 @@
 #!/bin/sh
 
-# Copy .env if missing
-if [ ! -f .env ]; then
-    cp .env.example .env
-fi
+# Generate .env dynamically
+cat <<EOL > .env
+APP_NAME=Laravel
+APP_ENV=production
+APP_KEY=$(php artisan key:generate --show)
+APP_DEBUG=false
+APP_URL=${APP_URL:-http://localhost}
 
-# Generate APP_KEY if missing
-php artisan key:generate --force
+DB_CONNECTION=sqlite
+DB_DATABASE=/var/www/html/database/database.sqlite
+EOL
+
+# Ensure database file exists
+touch /var/www/html/database/database.sqlite
 
 # Run migrations
 php artisan migrate --force
