@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Create .env if missing
+# Copy .env if missing
 if [ ! -f .env ]; then
     cp .env.example .env
 fi
@@ -17,5 +17,5 @@ php artisan cache:clear
 php artisan view:clear
 php artisan route:clear
 
-# Start PHP built-in server on port 80 (production for now)
-php -S 0.0.0.0:80 -t public
+# Start Laravel built-in server on port 80
+php artisan serve --host=0.0.0.0 --port=80

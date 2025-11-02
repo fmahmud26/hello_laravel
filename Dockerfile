@@ -1,16 +1,14 @@
-# Use Ubuntu 24.04 LTS as base
+# Base image
 FROM ubuntu:24.04
 
 WORKDIR /var/www/html
-
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-# Install system dependencies & PHP
+# Install PHP & dependencies
 RUN apt-get update && apt-get install -y \
     software-properties-common \
     curl \
-    wget \
     unzip \
     git \
     sqlite3 \
@@ -23,10 +21,8 @@ RUN apt-get update && apt-get install -y \
     sudo \
     nano \
     && add-apt-repository ppa:ondrej/php -y \
-    && apt-get update \
-    && apt-get install -y \
+    && apt-get update && apt-get install -y \
         php8.3-cli \
-        php8.3-fpm \
         php8.3-sqlite3 \
         php8.3-mbstring \
         php8.3-bcmath \
@@ -35,8 +31,7 @@ RUN apt-get update && apt-get install -y \
         php8.3-pdo \
         php8.3-pdo-mysql \
         php8.3-curl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
@@ -47,20 +42,19 @@ COPY . .
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Create storage and bootstrap/cache folders with write permissions
+# Create writable folders
 RUN mkdir -p storage bootstrap/cache database \
     && chmod -R 775 storage bootstrap/cache database
 
-# If using SQLite, create database file
-RUN touch database/database.sqlite \
-    && chmod 664 database/database.sqlite
+# Create SQLite file if missing
+RUN touch database/database.sqlite && chmod 664 database/database.sqlite
 
-# Copy entrypoint script
+# Entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Expose Laravel port
+# Expose port 80
 EXPOSE 80
 
-# Run entrypoint script as default
+# Default command
 CMD ["docker-entrypoint.sh"]
