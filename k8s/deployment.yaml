@@ -4,6 +4,14 @@ metadata:
   name: laravel-app
 spec:
   replicas: 1
+
+  # Rolling update strategy for zero downtime
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
       app: laravel-app
@@ -20,7 +28,7 @@ spec:
         - name: laravel-app
           image: fmahmud26/laravel-app:latest
           ports:
-            - containerPort: 80    # ✅ listen on port 80 instead of 8000
+            - containerPort: 80    # Laravel now serves on port 80
           env:
             - name: APP_ENV
               value: production
@@ -29,7 +37,7 @@ spec:
             - name: APP_URL
               value: "http://localhost"
 
-          # ✅ Resource requests to allow scheduling on EKS
+          # Resource requests to allow scheduling
           resources:
             requests:
               cpu: 100m
@@ -38,7 +46,7 @@ spec:
               cpu: 300m
               memory: 512Mi
 
-          # ✅ Run Laravel on port 80 instead of 8000
+          # Run Laravel on port 80
           command: ["php"]
           args: ["artisan", "serve", "--host=0.0.0.0", "--port=80"]
 
@@ -69,6 +77,6 @@ spec:
     app: laravel-app
   ports:
     - protocol: TCP
-      port: 80         # ✅ public LoadBalancer port
-      targetPort: 80   # ✅ Laravel now serves on port 80
+      port: 80         # Public LoadBalancer port
+      targetPort: 80   # Laravel container port
   type: LoadBalancer
