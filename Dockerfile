@@ -1,56 +1,68 @@
-# Dockerfile
-FROM php:8.2-fpm
+# Use Ubuntu 24.04 LTS as base
+FROM ubuntu:24.04
 
 # Set working directory
-WORKDIR /var/www
+WORKDIR /var/www/html
 
-# Install system dependencies
+# Avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Update & install dependencies
 RUN apt-get update && apt-get install -y \
-    git \
+    software-properties-common \
     curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
+    wget \
     unzip \
+    git \
     sqlite3 \
-    libsqlite3-dev \
-    nginx
+    zip \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype-dev \
+    libonig-dev \
+    libzip-dev \
+    sudo \
+    nano \
+    && add-apt-repository ppa:ondrej/php -y \
+    && apt-get update \
+    && apt-get install -y \
+        php8.3-cli \
+        php8.3-fpm \
+        php8.3-sqlite3 \
+        php8.3-mbstring \
+        php8.3-bcmath \
+        php8.3-xml \
+        php8.3-zip \
+        php8.3-pdo \
+        php8.3-pdo-mysql \
+        php8.3-curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo pdo_sqlite mbstring exif pcntl bcmath gd
+# Create storage and bootstrap/cache folders with write permissions
+RUN mkdir -p storage bootstrap/cache database \
+    && chmod -R 775 storage bootstrap/cache database
 
-# Install composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Copy application files
+# Copy project files
 COPY . .
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/sites-available/default
+# If using SQLite, create database file
+RUN touch database/database.sqlite \
+    && chmod 664 database/database.sqlite
 
-# Create sqlite database directory
-RUN mkdir -p /var/www/database
+# Run PHP artisan commands (cache clear, migrate, etc.)
+RUN php artisan config:clear \
+    && php artisan cache:clear \
+    && php artisan view:clear \
+    && php artisan route:clear \
+    && php artisan migrate || echo "Migration skipped if DB not set up"
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www/storage \
-    && chmod -R 755 /var/www/bootstrap/cache
+# Expose port 8000 for artisan serve
+EXPOSE 8000
 
-# Install dependencies (remove for production if needed)
-RUN composer install --no-dev --optimize-autoloader
-
-# Generate application key
-RUN php artisan key:generate
-
-# Expose port
-EXPOSE 80
-
-# Start script
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-
-CMD ["/start.sh"]
+# Default command to run Laravel
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]

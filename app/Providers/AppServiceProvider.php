@@ -1,10 +1,10 @@
 <?php
+// app/Providers/AppServiceProvider.php
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
-
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,10 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (env('APP_ENV') === 'production') {
-            $host = request()->getHost(); // gets public hostname from request
-            URL::forceRootUrl("http://$host");
+        // Force HTTPS in production (most common need)
+        if (config('app.force_https', false) || $this->app->environment('production')) {
+            URL::forceScheme('https');
         }
     }
-
 }
