@@ -1,57 +1,70 @@
-# k8s/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: laravel-app
+  namespace: default
   labels:
-    app: laravel
+    app: laravel-app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: laravel
+      app: laravel-app
   template:
     metadata:
       labels:
-        app: laravel
+        app: laravel-app
     spec:
       containers:
         - name: laravel-app
           image: fmahmud26/laravel-app:latest
           ports:
-            - containerPort: 80
+            - containerPort: 8000
           env:
             - name: APP_ENV
               value: "production"
             - name: APP_DEBUG
               value: "false"
+            - name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: laravel-secrets
+                  key: app-key
             - name: DB_CONNECTION
               value: "sqlite"
             - name: DB_DATABASE
-              value: "/var/www/database/database.sqlite"
-            - name: PORT
-              value: "80"
-          volumeMounts:
-            - name: storage-volume
-              mountPath: /var/www/storage
-            - name: database-volume
-              mountPath: /var/www/database
+              value: "/var/www/html/database/database.sqlite"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           livenessProbe:
             httpGet:
               path: /
-              port: 80
+              port: 8000
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /
-              port: 80
+              port: 8000
             initialDelaySeconds: 5
             periodSeconds: 5
+          volumeMounts:
+            - name: storage
+              mountPath: /var/www/html/storage
+            - name: bootstrap-cache
+              mountPath: /var/www/html/bootstrap/cache
+            - name: database
+              mountPath: /var/www/html/database
       volumes:
-        - name: storage-volume
-          emptyDir: {}
-        - name: database-volume
-          emptyDir: {}
-      imagePullSecrets:
-        - name: dockerhub-secret
+        - name: storage
+          emptyDir: { }
+        - name: bootstrap-cache
+          emptyDir: { }
+        - name: database
+          emptyDir: { }
+      restartPolicy: Always
