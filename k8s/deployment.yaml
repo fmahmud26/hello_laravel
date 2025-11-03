@@ -10,9 +10,9 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1           # Allows 1 extra pod during update
-      maxUnavailable: 0     # Ensures at least 2 pods are always available
-  minReadySeconds: 10       # Wait 10 seconds after pod becomes ready
+      maxSurge: 1
+      maxUnavailable: 0
+  minReadySeconds: 10
   selector:
     matchLabels:
       app: laravel-app
@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: laravel-app
-          image: YOUR_DOCKER_USERNAME/laravel-app:latest
+          image: YOUR_DOCKER_USERNAME/laravel-app:latest # (CI replaces :latest with version tag)
           ports:
             - containerPort: 8000
           env:
@@ -35,6 +35,11 @@ spec:
               value: "sqlite"
             - name: DB_DATABASE
               value: "/var/www/html/database/database.sqlite"
+            - name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: laravel-secrets
+                  key: app-key
           resources:
             requests:
               memory: "512Mi"
@@ -42,8 +47,16 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "500m"
-          # Proper health checks for zero-downtime
+          # Health probes tuned for Laravel startup
           livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
             httpGet:
               path: /
               port: 8000
@@ -51,21 +64,13 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 2
           startupProbe:
             httpGet:
               path: /
               port: 8000
-            initialDelaySeconds: 10
+            initialDelaySeconds: 20
             periodSeconds: 10
-            failureThreshold: 30  # Allow up to 5 minutes for startup
+            failureThreshold: 60 # allow ~10 minutes startup
           volumeMounts:
             - name: storage
               mountPath: /var/www/html/storage

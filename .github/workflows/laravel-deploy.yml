@@ -31,13 +31,20 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build Docker image
-      - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest .
+      # Generate dynamic image tag (timestamp + commit SHA)
+      - name: Generate image tag
+        id: vars
+        run: echo "TAG=$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-      # Push Docker image to Docker Hub
+      # Build Docker image with unique tag
+      - name: Build Docker image
+        run: |
+          echo "Building image: ${{ secrets.DOCKER_USERNAME }}/laravel-app:${TAG}"
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/laravel-app:${TAG} .
+
+      # Push versioned Docker image
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:latest
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/laravel-app:${TAG}
 
       # Configure AWS credentials
       - name: Configure AWS credentials
@@ -62,28 +69,32 @@ jobs:
               --from-literal=app-key=$(openssl rand -base64 32)
           fi
 
-
-      # Deploy to EKS
+      # Deploy to EKS using dynamic tag
       - name: Deploy to EKS
         run: |
-          # Replace Docker image in deployment
+          echo "Deploying image: ${{ secrets.DOCKER_USERNAME }}/laravel-app:${TAG}"
+
+          # Replace placeholders with actual Docker username and tag
           sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/deployment.yaml
-          
-          # Apply with zero-downtime strategy
-          echo "Starting zero-downtime deployment..."
+          sed -i "s|:latest|:${TAG}|g" k8s/deployment.yaml
+
+          echo "Applying Kubernetes manifests..."
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
-          
-          # Monitor the rollout with detailed information
-          echo "Monitoring deployment progress..."
-          kubectl rollout status deployment/laravel-app --timeout=600s --watch
-          
-          # Verify all pods are running
-          echo "Deployment completed. Verifying pod status..."
+
+          echo "Waiting for deployment rollout..."
+          kubectl rollout status deployment/laravel-app --timeout=600s
+
+          echo "✅ Deployment successful! Checking resources..."
           kubectl get pods -l app=laravel-app -o wide
-          
-          # Check service endpoints
-          echo "Service endpoints:"
+          kubectl get svc laravel-service
           kubectl get endpoints laravel-service
-          
-          echo "Deployment completed successfully!"
+
+      # Auto-debug logs if rollout fails
+      - name: Debug Pods on Failure
+        if: failure()
+        run: |
+          echo "---- Describe Pods ----"
+          kubectl describe pods -l app=laravel-app || true
+          echo "---- Recent Logs ----"
+          kubectl logs -l app=laravel-app --tail=100 --all-containers=true || true
