@@ -62,6 +62,7 @@ jobs:
               --from-literal=app-key=$(openssl rand -base64 32)
           fi
 
+
       # Deploy to EKS
       - name: Deploy to EKS
         run: |
