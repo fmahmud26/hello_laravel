@@ -86,4 +86,4 @@ jobs:
           echo "Service endpoints:"
           kubectl get endpoints laravel-service
           
-          echo "Zero-downtime deployment completed successfully!"
+          echo "Deployment completed successfully!"
