@@ -49,7 +49,7 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi \
 RUN echo '#!/bin/bash\n\
 cd /var/www/html\n\
 touch database/database.sqlite\n\
-chmod 664 database/database.sqlite\n\
+chmod 777 database/database.sqlite\n\
 php artisan migrate --force\n\
 php artisan serve --host=0.0.0.0 --port=8000' > /startup.sh \
     && chmod +x /startup.sh
