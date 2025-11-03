@@ -45,13 +45,39 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi \
     && chmod -R 775 storage bootstrap/cache database \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# Create startup script
+# Create startup script with SQLite lock handling
 RUN echo '#!/bin/bash\n\
+set -e\n\
 cd /var/www/html\n\
-touch database/database.sqlite\n\
-chmod 777 database/database.sqlite\n\
-php artisan migrate --force\n\
-php artisan serve --host=0.0.0.0 --port=8000' > /startup.sh \
+\n\
+# Wait for any existing database operations to complete\n\
+if [ -f database/database.sqlite ]; then\n\
+    echo "Waiting for database to be ready..."\n\
+    timeout 30s bash -c '\''while ! sqlite3 database/database.sqlite "SELECT 1;" > /dev/null 2>&1; do sleep 1; done'\'' || echo "Database check timed out, continuing..."\n\
+fi\n\
+\n\
+# Create database file if it doesn'\''t exist\n\
+if [ ! -f database/database.sqlite ]; then\n\
+    echo "Creating new SQLite database..."\n\
+    touch database/database.sqlite\n\
+    chmod 666 database/database.sqlite\n\
+fi\n\
+\n\
+# Run migrations with retry logic for concurrent access\n\
+echo "Running database migrations..."\n\
+for i in {1..5}; do\n\
+    if php artisan migrate --force --no-interaction; then\n\
+        echo "Migrations completed successfully"\n\
+        break\n\
+    else\n\
+        echo "Migration attempt \$i failed, retrying in 5 seconds..."\n\
+        sleep 5\n\
+    fi\n\
+done\n\
+\n\
+# Start the server\n\
+echo "Starting Laravel server on port 8000..."\n\
+exec php artisan serve --host=0.0.0.0 --port=8000' > /startup.sh \
     && chmod +x /startup.sh
 
 EXPOSE 8000

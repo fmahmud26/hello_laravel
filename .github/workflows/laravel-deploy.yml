@@ -62,21 +62,27 @@ jobs:
               --from-literal=app-key=$(openssl rand -base64 32)
           fi
 
-      # Replace image placeholder in development.yaml
-      #- name: Replace Docker image in deployment
-      #  run: |
-      #    sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" development.yaml
-
       # Deploy to EKS
       - name: Deploy to EKS
         run: |
-          # Apply development deployment
+          # Replace Docker image in deployment
+          sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/deployment.yaml
+          
+          # Apply with zero-downtime strategy
+          echo "Starting zero-downtime deployment..."
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           
-          # Wait for deployment to be ready
-          kubectl rollout status deployment/laravel-app --timeout=300s
+          # Monitor the rollout with detailed information
+          echo "Monitoring deployment progress..."
+          kubectl rollout status deployment/laravel-app --timeout=600s --watch
           
-          # Get service info
-          echo "Application deployed successfully!"
-          kubectl get service laravel-service
+          # Verify all pods are running
+          echo "Deployment completed. Verifying pod status..."
+          kubectl get pods -l app=laravel-app -o wide
+          
+          # Check service endpoints
+          echo "Service endpoints:"
+          kubectl get endpoints laravel-service
+          
+          echo "Zero-downtime deployment completed successfully!"

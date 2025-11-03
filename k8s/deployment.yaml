@@ -7,6 +7,12 @@ metadata:
     app: laravel-app
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1           # Allows 1 extra pod during update
+      maxUnavailable: 0     # Ensures at least 2 pods are always available
+  minReadySeconds: 10       # Wait 10 seconds after pod becomes ready
   selector:
     matchLabels:
       app: laravel-app
@@ -17,7 +23,7 @@ spec:
     spec:
       containers:
         - name: laravel-app
-          image: fmahmud26/laravel-app:latest
+          image: YOUR_DOCKER_USERNAME/laravel-app:latest
           ports:
             - containerPort: 8000
           env:
@@ -25,34 +31,41 @@ spec:
               value: "production"
             - name: APP_DEBUG
               value: "false"
-            - name: APP_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: laravel-secrets
-                  key: app-key
             - name: DB_CONNECTION
               value: "sqlite"
             - name: DB_DATABASE
               value: "/var/www/html/database/database.sqlite"
           resources:
             requests:
-              memory: "256Mi"
+              memory: "512Mi"
               cpu: "250m"
             limits:
-              memory: "512Mi"
+              memory: "1Gi"
               cpu: "500m"
+          # Proper health checks for zero-downtime
           livenessProbe:
             httpGet:
               path: /
               port: 8000
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /
               port: 8000
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 30  # Allow up to 5 minutes for startup
           volumeMounts:
             - name: storage
               mountPath: /var/www/html/storage
@@ -62,9 +75,8 @@ spec:
               mountPath: /var/www/html/database
       volumes:
         - name: storage
-          emptyDir: { }
+          emptyDir: {}
         - name: bootstrap-cache
-          emptyDir: { }
+          emptyDir: {}
         - name: database
-          emptyDir: { }
-      restartPolicy: Always
+          emptyDir: {}
