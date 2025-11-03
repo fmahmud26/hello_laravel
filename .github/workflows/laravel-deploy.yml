@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - cicd-with-eks
 
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
